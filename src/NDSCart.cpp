@@ -28,6 +28,7 @@
 #include "ROMList.h"
 #include "melonDLDI.h"
 #include "NDSCart_SRAMManager.h"
+#include "NDSCart_IRManager.h"
 
 
 namespace NDSCart
@@ -1105,6 +1106,7 @@ void CartRetailIR::Reset()
     CartRetail::Reset();
 
     IRCmd = 0;
+    IRBufferLength = 0;
 }
 
 void CartRetailIR::DoSavestate(Savestate* file)
@@ -1112,6 +1114,7 @@ void CartRetailIR::DoSavestate(Savestate* file)
     CartRetail::DoSavestate(file);
 
     file->Var8(&IRCmd);
+    // TO-DO: save IRBufferLength and IRBuffer
 }
 
 u8 CartRetailIR::SPIWrite(u8 val, u32 pos, bool last)
@@ -1126,14 +1129,71 @@ u8 CartRetailIR::SPIWrite(u8 val, u32 pos, bool last)
 
     switch (IRCmd)
     {
-    case 0x00: // pass-through
+    case 0x00: // Save EEPROM/NAND pass-through command
         return CartRetail::SPIWrite(val, pos-1, last);
 
-    case 0x08: // ID
+    case 0x01: // Infrared Rx command
+        return CartRetailIR::IRRx(val, pos-1, last);
+
+    case 0x02: // Infrared Tx command
+        return CartRetailIR::IRTx(val, pos-1, last);
+
+    case 0x08: // Identification command
         return 0xAA;
     }
 
     return 0;
+}
+
+//#define TRACE_IR_IO
+
+u8 CartRetailIR::IRRx(u8 val, u32 pos, bool last)
+{
+    #ifdef TRACE_IR_IO
+        printf("CartRetailIR::IRRx(0x%02x, %d, %d)\n", val, pos, last);
+        fflush(stdout);
+    #endif
+
+    u8 retval = 0x00;
+
+    if (pos == 0)
+    {
+        NDSCart_IRManager::IRRxBuffer(IRBuffer, &IRBufferLength);
+        retval = IRBufferLength;
+    }
+    else if (pos <= IRBufferLength)
+    {
+        retval = IRBuffer[pos-1];
+    }
+
+    if (last)
+    {
+        IRBufferLength = 0;
+    }
+
+    return retval;
+}
+
+u8 CartRetailIR::IRTx(u8 val, u32 pos, bool last)
+{
+    #ifdef TRACE_IR_IO
+        printf("CartRetailIR::IRTx(0x%02x, %d, %d)\n", val, pos, last);
+        fflush(stdout);
+    #endif
+
+    if (pos < 0xB8)
+    {
+        IRBufferLength = (u8) pos + 1;
+        IRBuffer[pos] = val;
+    }
+
+    if (last)
+    {
+        NDSCart_IRManager::IRTxBuffer(IRBuffer, IRBufferLength);
+        IRBufferLength = 0;
+    }
+
+    return 0x00;
 }
 
 

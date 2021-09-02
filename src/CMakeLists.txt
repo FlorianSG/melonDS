@@ -35,6 +35,7 @@ add_library(core STATIC
 	NDS.cpp
 	NDSCart.cpp
 	NDSCart_SRAMManager.cpp
+	NDSCart_IRManager.cpp
 	Platform.h
 	ROMList.h
 	RTC.cpp

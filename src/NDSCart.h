@@ -144,9 +144,14 @@ public:
 
     u8 SPIWrite(u8 val, u32 pos, bool last) override;
 
+    u8 IRRx(u8 val, u32 pos, bool last);
+    u8 IRTx(u8 val, u32 pos, bool last);
+
 private:
     u32 IRVersion;
     u8 IRCmd;
+    u8 IRBufferLength;
+    u8 IRBuffer[0xB8];
 };
 
 // CartRetailBT - Pokémon Typing Adventure (SPI BT controller)
