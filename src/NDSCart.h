@@ -21,6 +21,7 @@
 
 #include "types.h"
 #include "NDS_Header.h"
+#include "NDSCart_IRManager.h"
 
 namespace NDSCart
 {
@@ -143,15 +144,14 @@ public:
     void DoSavestate(Savestate* file) override;
 
     u8 SPIWrite(u8 val, u32 pos, bool last) override;
-
-    u8 IRRx(u8 val, u32 pos, bool last);
-    u8 IRTx(u8 val, u32 pos, bool last);
+    u8 IRTxByte(u8 val, u32 pos, bool last);
+    u8 IRRxByte(u8 val, u32 pos, bool last);
 
 private:
     u32 IRVersion;
     u8 IRCmd;
+    u8 IRBuffer[NDSCart_IRManager::MaximumBufferLength];
     u8 IRBufferLength;
-    u8 IRBuffer[0xB8];
 };
 
 // CartRetailBT - Pokémon Typing Adventure (SPI BT controller)

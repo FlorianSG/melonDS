@@ -28,7 +28,6 @@
 #include "ROMList.h"
 #include "melonDLDI.h"
 #include "NDSCart_SRAMManager.h"
-#include "NDSCart_IRManager.h"
 
 
 namespace NDSCart
@@ -1104,6 +1103,7 @@ CartRetailIR::~CartRetailIR()
 void CartRetailIR::Reset()
 {
     CartRetail::Reset();
+    NDSCart_IRManager::Setup();
 
     IRCmd = 0;
     IRBufferLength = 0;
@@ -1133,10 +1133,10 @@ u8 CartRetailIR::SPIWrite(u8 val, u32 pos, bool last)
         return CartRetail::SPIWrite(val, pos-1, last);
 
     case 0x01: // Infrared Rx command
-        return CartRetailIR::IRRx(val, pos-1, last);
+        return CartRetailIR::IRRxByte(val, pos-1, last);
 
     case 0x02: // Infrared Tx command
-        return CartRetailIR::IRTx(val, pos-1, last);
+        return CartRetailIR::IRTxByte(val, pos-1, last);
 
     case 0x08: // Identification command
         return 0xAA;
@@ -1145,39 +1145,12 @@ u8 CartRetailIR::SPIWrite(u8 val, u32 pos, bool last)
     return 0;
 }
 
-//#define TRACE_IR_IO
+// #define TRACE_IR_IO
 
-u8 CartRetailIR::IRRx(u8 val, u32 pos, bool last)
+u8 CartRetailIR::IRTxByte(u8 val, u32 pos, bool last)
 {
     #ifdef TRACE_IR_IO
-        printf("CartRetailIR::IRRx(0x%02x, %d, %d)\n", val, pos, last);
-        fflush(stdout);
-    #endif
-
-    u8 retval = 0x00;
-
-    if (pos == 0)
-    {
-        NDSCart_IRManager::IRRxBuffer(IRBuffer, &IRBufferLength);
-        retval = IRBufferLength;
-    }
-    else if (pos <= IRBufferLength)
-    {
-        retval = IRBuffer[pos-1];
-    }
-
-    if (last)
-    {
-        IRBufferLength = 0;
-    }
-
-    return retval;
-}
-
-u8 CartRetailIR::IRTx(u8 val, u32 pos, bool last)
-{
-    #ifdef TRACE_IR_IO
-        printf("CartRetailIR::IRTx(0x%02x, %d, %d)\n", val, pos, last);
+        printf("CartRetailIR::IRTxByte(0x%02x, %d, %d)\n", val, pos, last);
         fflush(stdout);
     #endif
 
@@ -1189,13 +1162,36 @@ u8 CartRetailIR::IRTx(u8 val, u32 pos, bool last)
 
     if (last)
     {
-        NDSCart_IRManager::IRTxBuffer(IRBuffer, IRBufferLength);
-        IRBufferLength = 0;
+        NDSCart_IRManager::TxBuffer(IRBuffer, &IRBufferLength);
     }
 
     return 0x00;
 }
 
+u8 CartRetailIR::IRRxByte(u8 val, u32 pos, bool last)
+{
+    u8 ret = 0x00;
+
+    if (pos == 0)
+    {
+        NDSCart_IRManager::RxBuffer(IRBuffer, &IRBufferLength);
+        ret = IRBufferLength;
+    }
+    else if (pos <= IRBufferLength)
+    {             
+        ret = IRBuffer[pos - 1];
+    }
+
+    if (last)
+        IRBufferLength = 0;
+
+    #ifdef TRACE_IR_IO
+        printf("CartRetailIR::IRRxByte(0x%02x, %d, %d) :=> 0x%02x\n", val, pos, last);
+        fflush(stdout);
+    #endif
+
+    return ret;
+}
 
 CartRetailBT::CartRetailBT(u8* rom, u32 len, u32 chipid) : CartRetail(rom, len, chipid)
 {

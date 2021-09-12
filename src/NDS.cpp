@@ -34,6 +34,7 @@
 #include "AREngine.h"
 #include "Platform.h"
 #include "NDSCart_SRAMManager.h"
+#include "NDSCart_IRManager.h"
 
 #ifdef JIT_ENABLED
 #include "ARMJIT.h"
@@ -194,6 +195,7 @@ bool Init()
     DMAs[7] = new DMA(1, 3);
 
     if (!NDSCart_SRAMManager::Init()) return false;
+    if (!NDSCart_IRManager::Init()) return false;
     if (!NDSCart::Init()) return false;
     if (!GBACart::Init()) return false;
     if (!GPU::Init()) return false;
@@ -222,6 +224,7 @@ void DeInit()
         delete DMAs[i];
 
     NDSCart_SRAMManager::DeInit();
+    NDSCart_IRManager::DeInit();
     NDSCart::DeInit();
     GBACart::DeInit();
     GPU::DeInit();

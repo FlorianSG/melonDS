@@ -23,8 +23,19 @@
 
 namespace NDSCart_IRManager
 {
-    void IRRxBuffer(u8* buffer, u8* len);
-    void IRTxBuffer(u8* buffer, u8 len);
+    const u8 MaximumBufferLength = 0xB8;
+    const s64 InterPacketTimeoutMs = 20;
+
+    bool Init();
+    void DeInit();
+    void Setup();
+
+    void TxBuffer(u8* buffer, u8* length);
+    void RxBuffer(u8* buffer, u8* length);
+
+    void IOThread_Main();
+    void IOThread_SendBuffer();
+    void IOThread_RecvBuffer();
 }
 
 #endif // NDSCART_IRMANAGER_H
