@@ -1103,7 +1103,7 @@ CartRetailIR::~CartRetailIR()
 void CartRetailIR::Reset()
 {
     CartRetail::Reset();
-    NDSCart_IRManager::Setup();
+    NDSCart_IRManager::Reset();
 
     IRCmd = 0;
     IRBufferLength = 0;
@@ -1140,20 +1140,17 @@ u8 CartRetailIR::SPIWrite(u8 val, u32 pos, bool last)
 
     case 0x08: // Identification command
         return 0xAA;
+
+    default:
+        printf("\n\n<<<< unmanaged SPIWrite(0x%02X, %d, %s) >>>>\n\n\n", val, pos, last ? "true" : "false");
+        fflush(stdout);
     }
 
     return 0;
 }
 
-// #define TRACE_IR_IO
-
 u8 CartRetailIR::IRTxByte(u8 val, u32 pos, bool last)
 {
-    #ifdef TRACE_IR_IO
-        printf("CartRetailIR::IRTxByte(0x%02x, %d, %d)\n", val, pos, last);
-        fflush(stdout);
-    #endif
-
     if (pos < 0xB8)
     {
         IRBufferLength = (u8) pos + 1;
@@ -1163,6 +1160,7 @@ u8 CartRetailIR::IRTxByte(u8 val, u32 pos, bool last)
     if (last)
     {
         NDSCart_IRManager::TxBuffer(IRBuffer, &IRBufferLength);
+        
     }
 
     return 0x00;
@@ -1184,11 +1182,6 @@ u8 CartRetailIR::IRRxByte(u8 val, u32 pos, bool last)
 
     if (last)
         IRBufferLength = 0;
-
-    #ifdef TRACE_IR_IO
-        printf("CartRetailIR::IRRxByte(0x%02x, %d, %d) :=> 0x%02x\n", val, pos, last);
-        fflush(stdout);
-    #endif
 
     return ret;
 }

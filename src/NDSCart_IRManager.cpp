@@ -16,226 +16,110 @@
     with melonDS. If not, see http://www.gnu.org/licenses/.
 */
 
-#include <stdio.h>
-#include <string.h>
-#include <chrono>
-#include <atomic>
 #include "NDSCart_IRManager.h"
-#include "Platform.h"
-#include "serialib/serialib.h"
+
+#ifdef IR_DEBUG
+#include <stdio.h>
+
+void printbuf(u8* buffer, u8* length) {
+    printf("[");
+    for (unsigned int i = 0; i < *length; ++i) {
+        printf("%i", buffer[i]);
+        if (i < *length - 1) printf(", ");
+    }
+    printf("]");
+}
+#endif
 
 namespace NDSCart_IRManager
 {
 
-u8 PendingTxBuffer[MaximumBufferLength];
-u8 PendingRxBuffer[MaximumBufferLength];
-
-u8 PendingTxBufferLength;
-u8 PendingRxBufferLength;
-
-Platform::Mutex* PendingTxBufferLock;
-Platform::Mutex* PendingRxBufferLock;
-
-Platform::Thread* IOThread;
-std::atomic_bool IOThreadRunning;
-
-u8 IOThread_TxBuffer[MaximumBufferLength];
-u8 IOThread_RxBuffer[MaximumBufferLength];
-
-u8 IOThread_TxBufferLength;
-u8 IOThread_RxBufferLength;
-
-s64 IOThread_LastRxTimestamp;
-
-serialib SerialConnection;
-bool SerialConnectionEstablished;
+N3T1R::IRCommunicationHandler irch;
 
 bool Init()
 {
+    #ifdef IR_DEBUG
     printf("NDSCart_IRManager::Init()\n");
     fflush(stdout);
-
-    PendingTxBufferLength = 0;
-    PendingRxBufferLength = 0;
-
-    PendingTxBufferLock = Platform::Mutex_Create();
-    PendingRxBufferLock = Platform::Mutex_Create();
-
-    int res = SerialConnection.openDevice("COM4", 115200);
-    if (res == 1)
-    {
-        SerialConnectionEstablished = true;
-    }
-    else
-    {
-        printf("Error while openning serial device 'COM4': ");
-        switch (res)
-        {
-            case -1:
-                printf("device not found !\n");
-                break;
-            case -2:
-                printf("error while opening the device !\n");
-                break;
-            case -3:
-                printf("error while getting port parameters !\n");
-                break;
-            case -4:
-                printf("speed (bauds) not recognized !\n");
-                break;
-            case -5:
-                printf("error while writing port parameters !\n");
-                break;
-            case -6:
-                printf("error while writing timeout parameters !\n");
-                break;
-        }
-        fflush(stdout);
-
-        SerialConnectionEstablished = false;
-    }
+    #endif
 
     return true;
 }
 
 void DeInit()
 {
+    #ifdef IR_DEBUG
     printf("NDSCart_IRManager::DeInit()\n");
     fflush(stdout);
-
-    if (IOThreadRunning)
-    {
-        IOThreadRunning = false;
-        Platform::Thread_Wait(IOThread);
-        Platform::Thread_Free(IOThread);
-    }
-
-    if (SerialConnectionEstablished)
-    {
-        printf("Closing serial connection...\n");
-        SerialConnection.closeDevice();
-    }
-
-    Platform::Mutex_Free(PendingTxBufferLock);
-    Platform::Mutex_Free(PendingRxBufferLock);
+    #endif
 }
 
-void Setup()
+void Reset()
 {
-    printf("NDSCart_IRManager::Setup()\n");
+    #ifdef IR_DEBUG
+    printf("NDSCart_IRManager::Reset()\n");
+    fflush(stdout);
+    #endif
+
+    printf("Listing N3T1R rooms:\n");
+    std::vector<std::string> rooms = N3T1R::IRCommunicationHandler::get_available_rooms();
+    for (std::vector<std::string>::iterator it = rooms.begin(); it != rooms.end(); ++it) {
+        printf("\t -> %s\n", it->c_str());
+    }
     fflush(stdout);
 
-    IOThreadRunning = true;
-    IOThread = Platform::Thread_Create(IOThread_Main);
-}
+    printf("Listing N3T1R serial ports:\n");
+    std::map<std::string, std::string> serial_ports = N3T1R::IRCommunicationHandler::get_available_serial_ports();
+    for (std::map<std::string, std::string>::iterator it = serial_ports.begin(); it != serial_ports.end(); ++it) {
+        printf("\t -> %s (%s)\n", it->first.c_str(), it->second.c_str());
+    }
+    fflush(stdout);
 
-void SwapBuffer(u8* src_buffer, u8* src_length, u8* dst_buffer, u8* dst_length)
-{
-    if (*src_length)
-    {
-        memcpy(dst_buffer, src_buffer, *src_length);
-        *dst_length = *src_length;
-        *src_length = 0;
+    irch.reset();
+
+    // TO-DO: proper backend selection
+    irch.select_serial_backend("COM7");
+    
+    try {
+        irch.enable();
+    }
+    catch (std::runtime_error& e) {
+        printf("\n\n<<<< irch.enable() error: %s >>>>\n\n\n", e.what());
     }
 }
 
 void TxBuffer(u8* buffer, u8* length) {
-    Platform::Mutex_Lock(PendingTxBufferLock);
-    SwapBuffer(buffer, length, PendingTxBuffer, &PendingTxBufferLength);
-    Platform::Mutex_Unlock(PendingTxBufferLock);
+    #ifdef IR_DEBUG
+    printf("NDSCart_IRManager::TxBuffer(");
+    printbuf(buffer, length);
+    printf("\n");
+    fflush(stdout);
+    #endif
+
+    try {
+        irch.send(buffer, (size_t) *length);
+    }
+    catch (std::runtime_error& e) {
+        printf("\n\n<<<< irch.send() error: %s >>>>\n\n\n", e.what());
+    }
 }
 
 void RxBuffer(u8* buffer, u8* length) {
-    Platform::Mutex_Lock(PendingRxBufferLock);
-    SwapBuffer(PendingRxBuffer, &PendingRxBufferLength, buffer, length);
-    Platform::Mutex_Unlock(PendingRxBufferLock);
-}
-
-void IOThread_Main()
-{
-    for (;;)
-    {
-        if (!IOThreadRunning)
-            return;
-        
-        IOThread_SendBuffer();
-        IOThread_RecvBuffer();
-
-        Platform::Sleep(250); // 250 µs
+    try {
+        *length = irch.receive(buffer, MaximumBufferLength);
     }
-}
-
-// For devel/debug only
-void printbuff(u8* buffer, u8 len)
-{
-    for (int i = 0; i < len; ++i) {
-        printf("0x%02x ", buffer[i]);
+    catch (std::runtime_error& e) {
+        printf("\n\n<<<< irch.receive() error: %s >>>>\n\n\n", e.what());
     }
-}
 
-void IOThread_SendBuffer()
-{
-
-    Platform::Mutex_Lock(PendingTxBufferLock);
-    SwapBuffer(PendingTxBuffer, &PendingTxBufferLength, IOThread_TxBuffer, &IOThread_TxBufferLength);
-    Platform::Mutex_Unlock(PendingTxBufferLock);
-
-    if (IOThread_TxBufferLength)
-    {
-        printf("NDSCart_IRManager::IOThread_SendBuffer( ");
-        printbuff(IOThread_TxBuffer, IOThread_TxBufferLength);
-        printf(")\n\n");
+    #ifdef IR_DEBUG
+    if (*length) {
+        printf("NDSCart_IRManager::RxBuffer() -> ");
+        printbuf(buffer, length);
+        printf("\n");
         fflush(stdout);
-
-        if (SerialConnectionEstablished)
-        {
-            SerialConnection.writeBytes(IOThread_TxBuffer, IOThread_TxBufferLength);
-        }
-
-        IOThread_TxBufferLength = 0;
     }
-}
-
-s64 IOThread_getMsTimestamp()
-{
-    auto now = std::chrono::steady_clock::now();
-    return std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
-}
-
-void IOThread_RecvBuffer()
-{
-    u8 buffer[MaximumBufferLength];
-    u8 buffer_length = 0;
-
-    if (SerialConnectionEstablished)
-    {
-        if (SerialConnection.available())
-        {
-            IOThread_LastRxTimestamp = IOThread_getMsTimestamp();
-            buffer_length = (u8) SerialConnection.readBytes(buffer, MaximumBufferLength, 1);
-
-            if (IOThread_RxBufferLength + buffer_length <= MaximumBufferLength)
-            {
-                memcpy((IOThread_RxBuffer + IOThread_RxBufferLength), buffer, buffer_length);
-                IOThread_RxBufferLength += buffer_length;
-            }
-            else
-            {
-                printf("NDSCart_IRManager::IOThread_RecvBuffer() => Oooops, too much data: %i bytes !\n", IOThread_RxBufferLength + buffer_length);
-            }
-        }
-        else if (IOThread_getMsTimestamp() - IOThread_LastRxTimestamp > InterPacketTimeoutMs && IOThread_RxBufferLength)
-        {
-            printf("NDSCart_IRManager::IOThread_RecvBuffer( ");
-            printbuff(IOThread_RxBuffer, IOThread_RxBufferLength);
-            printf(")\n\n");
-            fflush(stdout);
-
-            Platform::Mutex_Lock(PendingRxBufferLock);
-            SwapBuffer(IOThread_RxBuffer, &IOThread_RxBufferLength, PendingRxBuffer, &PendingRxBufferLength);
-            Platform::Mutex_Unlock(PendingRxBufferLock);
-        }
-    }
+    #endif
 }
 
 }

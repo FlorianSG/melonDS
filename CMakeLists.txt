@@ -142,3 +142,6 @@ add_subdirectory(src)
 if (BUILD_QT_SDL)
 	add_subdirectory(src/frontend/qt_sdl)
 endif()
+
+get_filename_component(N3T1R_DLL "lib/n3t1r.dll" ABSOLUTE)
+target_link_libraries(${PROJECT_NAME} ${N3T1R_DLL})

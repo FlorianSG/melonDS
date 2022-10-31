@@ -20,22 +20,20 @@
 #define NDSCART_IRMANAGER_H
 
 #include "types.h"
+#include "n3t1r/n3t1r.hpp"
+
+//#define IR_DEBUG
 
 namespace NDSCart_IRManager
 {
-    const u8 MaximumBufferLength = 0xB8;
-    const s64 InterPacketTimeoutMs = 20;
-
+    constexpr static const u8 MaximumBufferLength = N3T1R::IRCommunicationHandler::MAXIMUM_DATA_LENGTH;
+    
     bool Init();
     void DeInit();
-    void Setup();
+    void Reset();
 
     void TxBuffer(u8* buffer, u8* length);
     void RxBuffer(u8* buffer, u8* length);
-
-    void IOThread_Main();
-    void IOThread_SendBuffer();
-    void IOThread_RecvBuffer();
 }
 
 #endif // NDSCART_IRMANAGER_H

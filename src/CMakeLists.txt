@@ -49,7 +49,6 @@ add_library(core STATIC
 
 	tiny-AES-c/aes.c
 	xxhash/xxhash.c
-	serialib/serialib.cpp
 )
 
 if (ENABLE_OGLRENDERER)
