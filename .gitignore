@@ -12,7 +12,9 @@ cmake-build-debug
 .idea
 
 *.exe
+*.dll
 
 .DS_Store
 
 .workbook
+*.sublime-*
